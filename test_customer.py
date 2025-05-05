@@ -1,3 +1,4 @@
+import pytest
 from faker import Faker
 
 from db import (
@@ -10,7 +11,8 @@ from db import (
 )
 
 
-def customer_data():
+@pytest.fixture()
+def customer_data() -> dict:
     fake = Faker("ru_RU")
     return {
         "firstname": fake.first_name(),
@@ -21,7 +23,8 @@ def customer_data():
     }
 
 
-def updated_data():
+@pytest.fixture()
+def updated_data() -> dict:
     return {
         "firstname": "test_firstname",
         "lastname": "test_lastname",
@@ -30,48 +33,50 @@ def updated_data():
     }
 
 
-def test_create_customer(connection):
-    customer_to_add = customer_data()
-    customer_id = create_customer(connection, customer_to_add)
-    customer = get_customer_by_id(connection, customer_id)
-    assert customer["firstname"] == customer_to_add["firstname"]
-    assert customer["lastname"] == customer_to_add["lastname"]
-    assert customer["email"] == customer_to_add["email"]
+@pytest.fixture()
+def created_customer(connection, customer_data):
+    customer_id = create_customer(connection, customer_data)
+    yield customer_id
+    delete_customer(connection, customer_id)
 
 
-def test_update_customer(connection):
-    customer_to_update = customer_data()
-    customer_id = create_customer(connection, customer_to_update)
-    update_customer(connection, customer_id, updated_data())
-    customer = get_customer_by_id(connection, customer_id)
-    assert customer == updated_data()
-
-
-def test_update_customer_negative(connection):
+@pytest.fixture()
+def non_existed_customer_id(connection) -> int:
     max_customer_id = get_max_customer_id(connection)
-    if max_customer_id > 0:
-        customer_id = max_customer_id + 1
-    else:
-        customer_id = 1
-    update_customer(connection, customer_id, updated_data())
+    return max_customer_id + 1 if max_customer_id else 1
+
+
+@pytest.fixture()
+def customers_count(connection) -> int:
+    return get_count_customers(connection)
+
+
+def test_create_customer(connection, customer_data):
+    customer_id = create_customer(connection, customer_data)
     customer = get_customer_by_id(connection, customer_id)
+    for field_to_check in customer:
+        assert customer[field_to_check] == customer_data[field_to_check]
+    delete_customer(connection, customer_id)
+
+
+def test_update_customer(connection, updated_data, created_customer):
+    update_customer(connection, created_customer, updated_data)
+    customer = get_customer_by_id(connection, created_customer)
+    assert customer == updated_data
+
+
+def test_update_customer_negative(connection, non_existed_customer_id, updated_data):
+    update_customer(connection, non_existed_customer_id, updated_data)
+    customer = get_customer_by_id(connection, non_existed_customer_id)
     assert customer is None
 
 
-def test_delete_customer(connection):
-    customer_to_delete = customer_data()
-    customer_id = create_customer(connection, customer_to_delete)
-    delete_customer(connection, customer_id)
-    customer = get_customer_by_id(connection, customer_id)
+def test_delete_customer(connection, created_customer):
+    delete_customer(connection, created_customer)
+    customer = get_customer_by_id(connection, created_customer)
     assert customer is None
 
 
-def test_delete_customer_negative(connection):
-    count_customers = get_count_customers(connection)
-    max_customer_id = get_max_customer_id(connection)
-    if max_customer_id > 0:
-        customer_id = max_customer_id + 1
-    else:
-        customer_id = 1
-    delete_customer(connection, customer_id)
-    assert get_count_customers(connection) == count_customers
+def test_delete_customer_negative(connection, non_existed_customer_id, customers_count):
+    delete_customer(connection, non_existed_customer_id)
+    assert get_count_customers(connection) == customers_count

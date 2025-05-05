@@ -25,8 +25,8 @@ def create_customer(connection, customer_data: dict) -> int:
                 date.today(),
             ),
         )
-        connection.commit()
-        return cursor.lastrowid
+    connection.commit()
+    return cursor.lastrowid
 
 
 def update_customer(connection, customer_id: int, update_data) -> None:
@@ -42,14 +42,14 @@ def update_customer(connection, customer_id: int, update_data) -> None:
                 customer_id,
             ),
         )
-        connection.commit()
+    connection.commit()
 
 
 def delete_customer(connection, customer_id: int) -> None:
     with connection.cursor() as cursor:
         sql = "DELETE FROM oc_customer WHERE customer_id = %s"
         cursor.execute(sql, (customer_id,))
-        connection.commit()
+    connection.commit()
 
 
 def get_customer_by_id(connection, customer_id: int) -> dict:
